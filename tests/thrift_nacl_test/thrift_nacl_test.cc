@@ -17,7 +17,7 @@
 #include "ppapi/cpp/module.h"
 #include "ppapi_simple/ps_main.h"
 
-#include "test_types.h"
+#include "thrift_nacl_test_types.h"
 
 using apache::thrift::protocol::TNativeClientProtocol;
 using apache::thrift::protocol::TProtocolException;
