@@ -1,0 +1,369 @@
+diff --git a/Makefile.in b/Makefile.in
+index e6e4c9b..e816e2b 100644
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -339,7 +339,7 @@ top_build_prefix = @top_build_prefix@
+ top_builddir = @top_builddir@
+ top_srcdir = @top_srcdir@
+ ACLOCAL_AMFLAGS = -I ./aclocal
+-SUBDIRS = compiler/cpp lib tutorial $(am__append_1) tutorial
++SUBDIRS = compiler/cpp
+ EXTRA_DIST = \
+ 	.travis.yml \
+ 	contrib \
+diff --git a/compiler/cpp/src/generate/t_cpp_generator.cc b/compiler/cpp/src/generate/t_cpp_generator.cc
+index 523ce24..6c59730 100644
+--- a/compiler/cpp/src/generate/t_cpp_generator.cc
++++ b/compiler/cpp/src/generate/t_cpp_generator.cc
+@@ -116,6 +116,7 @@ class t_cpp_generator : public t_oop_generator {
+                                       bool write=true,
+                                       bool swap=false);
+   void generate_struct_fingerprint   (std::ofstream& out, t_struct* tstruct, bool is_definition);
++  void generate_struct_field_type_map(std::ofstream& out, t_struct* tstruct);
+   void generate_struct_reader        (std::ofstream& out, t_struct* tstruct, bool pointers=false);
+   void generate_struct_writer        (std::ofstream& out, t_struct* tstruct, bool pointers=false);
+   void generate_struct_result_writer (std::ofstream& out, t_struct* tstruct, bool pointers=false);
+@@ -356,6 +357,11 @@ void t_cpp_generator::init_generator() {
+     "#define " << program_name_ << "_TYPES_TCC" << endl <<
+     endl;
+ 
++  f_types_ << 
++    "#include <map>" << endl <<
++    "#include <string>" << endl <<
++    endl;
++
+   // Include base types
+   f_types_ <<
+     "#include <thrift/Thrift.h>" << endl <<
+@@ -807,6 +813,8 @@ void t_cpp_generator::generate_struct_definition(ofstream& out,
+   string extends = "";
+   if (is_exception) {
+     extends = " : public ::apache::thrift::TException";
++  } else if (!gen_templates_) {
++    extends = " : public ::apache::thrift::TStruct";
+   }
+ 
+   // Get members
+@@ -931,34 +939,40 @@ void t_cpp_generator::generate_struct_definition(ofstream& out,
+       endl << endl;
+   }
+ 
+-  // Declare all fields
+-  for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
+-    indent(out) <<
+-      declare_field(*m_iter, false, pointers && !(*m_iter)->get_type()->is_xception(), !read) << endl;
+-  }
+-
+-  // Add the __isset data member if we need it, using the definition from above
+-  if (has_nonrequired_fields && (!pointers || read)) {
+-    out <<
+-      endl <<
+-      indent() << "_" << tstruct->get_name() << "__isset __isset;" << endl;
+-  }
+ 
+   // Create a setter function for each field
+   for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
+     if (pointers) {
+       continue;
+     }
++    bool is_optional = (*m_iter)->get_req() == t_field::T_OPTIONAL;
++    if (is_optional) {
++      out <<
++        endl <<
++        indent() << "inline bool has_" << (*m_iter)->get_name() << 
++          "() const {" << endl <<
++          indent() << "  return __isset." << (*m_iter)->get_name() << ";" << 
++          endl <<
++          indent() << "}" << endl;
++    }
++
++    out <<
++      endl <<
++      indent() << "inline " << type_name((*m_iter)->get_type(), false, true) <<
++        " get_" << (*m_iter)->get_name() <<
++        "() const {" << endl <<
++        indent() << "  return " << (*m_iter)->get_name() << ";" << endl <<
++        indent() << "}" << endl;
++  
+     out <<
+       endl <<
+-      indent() << "void __set_" << (*m_iter)->get_name() <<
++      indent() << "inline void set_" << (*m_iter)->get_name() <<
+         "(" << type_name((*m_iter)->get_type(), false, true);
+     out << " val) {" << endl << indent() <<
+       indent() << (*m_iter)->get_name() << " = val;" << endl;
+ 
+     // assume all fields are required except optional fields.
+     // for optional fields change __isset.name to true
+-    bool is_optional = (*m_iter)->get_req() == t_field::T_OPTIONAL;
+     if (is_optional) {
+       out <<
+         indent() <<
+@@ -966,6 +980,24 @@ void t_cpp_generator::generate_struct_definition(ofstream& out,
+     }
+     out <<
+       indent()<< "}" << endl;
++
++    if (is_complex_type((*m_iter)->get_type())) {
++      out <<
++        endl <<
++        indent() << "inline " <<
++          type_name((*m_iter)->get_type(), false, false) << "*" <<
++          " mutable_" << (*m_iter)->get_name() << "() {" << endl;
++          if (is_optional) {
++            out <<
++              indent() <<
++              indent() << "__isset." << (*m_iter)->get_name() << " = true;" <<
++              endl;
++          }
++      out <<
++          indent() << "  return &" << (*m_iter)->get_name() << ";" << endl <<
++          indent() << "}" << endl;
++    }
++
+   }
+   out << endl;
+ 
+@@ -1017,7 +1049,7 @@ void t_cpp_generator::generate_struct_definition(ofstream& out,
+         indent() << "uint32_t read(Protocol_* iprot);" << endl;
+     } else {
+       out <<
+-        indent() << "uint32_t read(" <<
++        indent() << "virtual uint32_t read(" <<
+         "::apache::thrift::protocol::TProtocol* iprot);" << endl;
+     }
+   }
+@@ -1028,24 +1060,41 @@ void t_cpp_generator::generate_struct_definition(ofstream& out,
+         indent() << "uint32_t write(Protocol_* oprot) const;" << endl;
+     } else {
+       out <<
+-        indent() << "uint32_t write(" <<
++        indent() << "virtual uint32_t write(" <<
+         "::apache::thrift::protocol::TProtocol* oprot) const;" << endl;
+     }
+   }
+   out << endl;
+ 
+-  indent_down();
+-  indent(out) <<
+-    "};" << endl <<
+-    endl;
++  out << " private:" << endl;
++  out << indent() << "static std::map<std::string, apache::thrift::protocol::TFieldTypeSpec> field_type_map;" << endl; 
++  out << indent() << "static const apache::thrift::protocol::TFieldTypeSpec* get_field_type(const std::string& fname);" << endl << endl;
++
++  // Declare all fields
++  for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
++    indent(out) <<
++      declare_field(*m_iter, false, pointers && !(*m_iter)->get_type()->is_xception(), !read) << endl;
++  }
++
++  // Add the __isset data member if we need it, using the definition from above
++  if (has_nonrequired_fields && (!pointers || read)) {
++    out <<
++      endl <<
++      indent() << "_" << tstruct->get_name() << "__isset __isset;" << endl;
++  }
+ 
+   if (swap) {
+     // Generate a namespace-scope swap() function
+     out <<
+-      indent() << "void swap(" << tstruct->get_name() << " &a, " <<
++      indent() << "friend void swap(" << tstruct->get_name() << " &a, " <<
+       tstruct->get_name() << " &b);" << endl <<
+       endl;
+   }
++
++  indent_down();
++  indent(out) <<
++    "};" << endl <<
++    endl;
+ }
+ 
+ /**
+@@ -1216,6 +1265,50 @@ void t_cpp_generator::generate_local_reflection_pointer(std::ofstream& out,
+     endl << endl;
+ }
+ 
++void t_cpp_generator::generate_struct_field_type_map(std::ofstream& out,
++                                                     t_struct* tstruct) {
++  const vector<t_field*>& fields = tstruct->get_members();
++  vector<t_field*>::const_iterator f_iter;
++
++  out << indent() << "using ::apache::thrift::protocol::TFieldTypeSpec;" <<
++    endl << endl;
++  out << indent() << "/* static */" << endl;
++  out << indent() <<
++    "std::map<std::string, ::apache::thrift::protocol::TFieldTypeSpec> " <<
++    tstruct->get_name() << "::field_type_map;" << endl << endl;
++  out << indent() << "/* static */" << endl;
++  out << indent() << "const TFieldTypeSpec* " <<
++    tstruct->get_name() << "::get_field_type(const std::string& fname) {" <<
++    endl;
++  indent_up();
++
++  out << indent() << "if (field_type_map.empty()) {" << endl;
++  indent_up();
++  
++  for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
++    const t_field* field = *f_iter;
++    out << indent() <<
++      "field_type_map.insert(std::pair<std::string, TFieldTypeSpec>(" << endl;
++    indent_up();
++    indent_up();
++    out << indent() << "\"" << field->get_name() <<
++      "\", TFieldTypeSpec(" << field->get_key() << ", " <<
++      type_to_enum(field->get_type()) << ")));" << endl;
++    indent_down();
++    indent_down();
++  }
++
++  indent_down();
++  out << indent() << "}" << endl << endl;
++
++  out << indent() << "std::map<std::string, ::apache::thrift::protocol::TFieldTypeSpec>::iterator iter;" << endl;
++  out << indent() << "iter = field_type_map.find(fname);" << endl;
++  out << indent() << "return iter == field_type_map.end() ? NULL : &iter->second;" << endl;
++
++  indent_down();
++  out << indent() << "}" << endl << endl;
++}
++
+ /**
+  * Makes a helper function to gen a struct reader.
+  *
+@@ -1225,6 +1318,8 @@ void t_cpp_generator::generate_local_reflection_pointer(std::ofstream& out,
+ void t_cpp_generator::generate_struct_reader(ofstream& out,
+                                              t_struct* tstruct,
+                                              bool pointers) {
++  generate_struct_field_type_map(out, tstruct);
++
+   if (gen_templates_) {
+     out <<
+       indent() << "template <class Protocol_>" << endl <<
+@@ -1276,6 +1371,16 @@ void t_cpp_generator::generate_struct_reader(ofstream& out,
+       indent() << "  break;" << endl <<
+       indent() << "}" << endl;
+ 
++    out <<
++      indent() << "if (fid == ::apache::thrift::protocol::kFieldIdUnknown) {" << endl <<
++      indent() << "  const TFieldTypeSpec* field_type = get_field_type(fname);" << endl <<
++      indent() << "  if (field_type != NULL) {" << endl <<
++      indent() << "    fid = field_type->fid;" << endl <<
++      indent() << "    ftype = field_type->ftype;" << endl <<
++      indent() << "  }" << endl <<
++      indent() << "}" << endl;
++    
++
+     if(fields.empty()) {
+       out <<
+         indent() << "xfer += iprot->skip(ftype);" << endl;
+diff --git a/configure b/configure
+index 94b1beb..1ec073f 100755
+--- a/configure
++++ b/configure
+@@ -6538,7 +6538,7 @@ irix5* | irix6* | nonstopux*)
+   ;;
+ 
+ # This must be glibc/ELF.
+-linux* | k*bsd*-gnu | kopensolaris*-gnu)
++linux* | k*bsd*-gnu | kopensolaris*-gnu | nacl*)
+   lt_cv_deplibs_check_method=pass_all
+   ;;
+ 
+@@ -11896,6 +11896,17 @@ uts4*)
+   shlibpath_var=LD_LIBRARY_PATH
+   ;;
+ 
++nacl)
++  if $CC -v 2>&1 | grep -q enable-shared; then
++    dynamic_linker="GNU/NaCl ld.so"
++    version_type=linux
++    library_names_spec='${libname}${release}${shared_ext}$versuffix ${libname}${release}${shared_ext}${major} ${libname}${shared_ext}'
++    soname_spec='${libname}${release}${shared_ext}$major'
++  else
++    dynamic_linker=no
++  fi
++  ;;
++
+ *)
+   dynamic_linker=no
+   ;;
+@@ -15742,6 +15753,17 @@ uts4*)
+   shlibpath_var=LD_LIBRARY_PATH
+   ;;
+ 
++nacl)
++  if $CC -v 2>&1 | grep -q enable-shared; then
++    dynamic_linker="GNU/NaCl ld.so"
++    version_type=linux
++    library_names_spec='${libname}${release}${shared_ext}$versuffix ${libname}${release}${shared_ext}${major} ${libname}${shared_ext}'
++    soname_spec='${libname}${release}${shared_ext}$major'
++  else
++    dynamic_linker=no
++  fi
++  ;;
++
+ *)
+   dynamic_linker=no
+   ;;
+diff --git a/lib/cpp/src/thrift/Thrift.h b/lib/cpp/src/thrift/Thrift.h
+index 03caa9e..12e9b1f 100644
+--- a/lib/cpp/src/thrift/Thrift.h
++++ b/lib/cpp/src/thrift/Thrift.h
+@@ -158,6 +158,17 @@ class TException : public std::exception {
+ 
+ };
+ 
++namespace protocol {
++class TProtocol;
++}
++
++// Base class for generated structs
++class TStruct {
++ public:
++  virtual uint32_t read(::apache::thrift::protocol::TProtocol* iprot) = 0;
++  virtual uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const = 0;
++};
++
+ 
+ // Forward declare this structure used by TDenseProtocol
+ namespace reflection { namespace local {
+diff --git a/lib/cpp/src/thrift/protocol/TProtocol.h b/lib/cpp/src/thrift/protocol/TProtocol.h
+index d6ecc0f..0c1472c 100644
+--- a/lib/cpp/src/thrift/protocol/TProtocol.h
++++ b/lib/cpp/src/thrift/protocol/TProtocol.h
+@@ -146,6 +146,7 @@ using apache::thrift::transport::TTransport;
+  * the end of a sequence of fields.
+  */
+ enum TType {
++  T_UNKNOWN    = -1,
+   T_STOP       = 0,
+   T_VOID       = 1,
+   T_BOOL       = 2,
+@@ -166,6 +167,16 @@ enum TType {
+   T_UTF16      = 17
+ };
+ 
++const int16_t kFieldIdUnknown = -1;
++
++class TFieldTypeSpec {
++ public:
++  TFieldTypeSpec(int16_t fid, TType ftype) : fid(fid), ftype(ftype) {}
++
++  int16_t fid;
++  TType ftype;
++};
++
+ /**
+  * Enumerated definition of the message types that the Thrift protocol
+  * supports.
+@@ -279,6 +290,8 @@ uint32_t skip(Protocol_& prot, TType type) {
+     }
+   case T_STOP: case T_VOID: case T_U64: case T_UTF8: case T_UTF16:
+     break;
++  case T_UNKNOWN:
++    break;
+   }
+   return 0;
+ }
