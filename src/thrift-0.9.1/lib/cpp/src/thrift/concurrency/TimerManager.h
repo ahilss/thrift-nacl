@@ -23,6 +23,7 @@
 #include <thrift/concurrency/Exception.h>
 #include <thrift/concurrency/Monitor.h>
 #include <thrift/concurrency/Thread.h>
+#include <thrift/concurrency/Util.h>
 
 #include <boost/shared_ptr.hpp>
 #include <map>

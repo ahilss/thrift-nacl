@@ -75,5 +75,97 @@ void base64_decode(uint8_t *buf, uint32_t len) {
   }
 }
 
+void base64_decode(const uint8_t *in, uint32_t len, uint8_t *out) {
+  out[0] = (kBase64DecodeTable[in[0]] << 2) |
+           (kBase64DecodeTable[in[1]] >> 4);
+  if (len > 2) {
+    out[1] = ((kBase64DecodeTable[in[1]] << 4) & 0xf0) |
+              (kBase64DecodeTable[in[2]] >> 2);
+    if (len > 3) {
+      out[2] = ((kBase64DecodeTable[in[2]] << 6) & 0xc0) |
+                (kBase64DecodeTable[in[3]]);
+    }
+  }
+}
+
+void base64EncodeString(const std::string& in, std::string* out) {
+  static const size_t kEncodeRemainderSize[3] = {0, 2, 3};
+
+  if (in.empty()) {
+    out->clear();
+    return;
+  }
+
+  size_t in_size = in.size();
+  const uint8_t *in_data = (const uint8_t*)in.data();
+
+  size_t remainder = in_size % 3;
+  size_t out_size = 4 * (in_size / 3) + kEncodeRemainderSize[remainder];
+  uint8_t* out_data = new uint8_t[out_size];
+
+  const uint8_t* in_ptr = in_data;
+  uint8_t* out_ptr = out_data;
+
+  const uint8_t* end_ptr = in_data + in_size - remainder;
+
+  while (in_ptr != end_ptr) {
+    // Encode 3 bytes at a time
+    base64_encode(in_ptr, 3, out_ptr);
+    in_ptr += 3;
+    out_ptr += 4;
+  }
+
+  if (remainder > 0) {
+    // Handle remainder
+    base64_encode(in_ptr, remainder, out_ptr);
+  }
+
+  out->assign((char*)out_data, out_size);
+  delete [] out_data;
+}
+
+bool base64DecodeString(const std::string& in, std::string* out) {
+  static const size_t kDecodeRemainderSize[4] = {0, 0, 1, 2};
+
+  if (in.empty()) {
+    out->clear();
+    return true;
+  }
+
+  size_t in_size = in.size();
+  const uint8_t *in_data = (const uint8_t*)in.data();
+
+  size_t remainder = in_size % 4;
+  // A single leftover byte is not decodable
+  if (remainder == 1) {
+    return false;
+  }
+
+  size_t out_size = 3 * (in_size / 4) + kDecodeRemainderSize[remainder];
+  uint8_t* out_data = new uint8_t[out_size];
+
+  const uint8_t* in_ptr = in_data;
+  uint8_t* out_ptr = out_data;
+
+  const uint8_t* end_ptr = in_data + in_size - remainder;
+
+  while (in_ptr != end_ptr) {
+    // Decode 4 bytes at a time
+    base64_decode(in_ptr, 4, out_ptr);
+    in_ptr += 4;
+    out_ptr += 3;
+  }
+
+  if (remainder > 0) {
+    // Handle remainder
+    base64_decode(in_ptr, remainder, out_ptr);
+  }
+
+  out->assign((char*)out_data, out_size);
+  delete [] out_data;
+
+  return true;
+}
+
 
 }}} // apache::thrift::protocol

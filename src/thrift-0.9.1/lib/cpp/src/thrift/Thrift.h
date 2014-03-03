@@ -158,6 +158,16 @@ class TException : public std::exception {
 
 };
 
+namespace protocol {
+class TProtocol;
+}
+
+// Base class for generated structs
+class TStruct {
+ public:
+  virtual uint32_t read(::apache::thrift::protocol::TProtocol* iprot) = 0;
+  virtual uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const = 0;
+};
 
 // Forward declare this structure used by TDenseProtocol
 namespace reflection { namespace local {

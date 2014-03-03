@@ -301,7 +301,7 @@ void TServerSocket::listen() {
 
   if (! path_.empty()) {
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__native_client__)
 
     // Unix Domain Socket
     struct sockaddr_un address;

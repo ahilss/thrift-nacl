@@ -125,6 +125,7 @@ class PthreadThread: public Thread {
 	policy_ = PosixThreadFactory::OTHER;
     #endif
 
+#ifndef __native_client__
     if (pthread_attr_setschedpolicy(&thread_attr, policy_) != 0) {
       throw SystemResourceException("pthread_attr_setschedpolicy failed");
     }
@@ -136,6 +137,7 @@ class PthreadThread: public Thread {
     if (pthread_attr_setschedparam(&thread_attr, &sched_param) != 0) {
       throw SystemResourceException("pthread_attr_setschedparam failed");
     }
+#endif
 
     // Create reference
     shared_ptr<PthreadThread>* selfRef = new shared_ptr<PthreadThread>();

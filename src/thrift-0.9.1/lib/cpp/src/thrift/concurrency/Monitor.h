@@ -22,6 +22,7 @@
 
 #include <thrift/concurrency/Exception.h>
 #include <thrift/concurrency/Mutex.h>
+#include <thrift/concurrency/Util.h>
 
 #include <boost/utility.hpp>
 

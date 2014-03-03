@@ -146,6 +146,7 @@ using apache::thrift::transport::TTransport;
  * the end of a sequence of fields.
  */
 enum TType {
+  T_UNKNOWN    = -1,
   T_STOP       = 0,
   T_VOID       = 1,
   T_BOOL       = 2,
@@ -164,6 +165,16 @@ enum TType {
   T_LIST       = 15,
   T_UTF8       = 16,
   T_UTF16      = 17
+};
+
+const int16_t kFieldIdUnknown = -1;
+
+class TFieldTypeSpec {
+ public:
+  TFieldTypeSpec(int16_t fid, TType ftype) : fid(fid), ftype(ftype) {}
+
+  int16_t fid;
+  TType ftype;
 };
 
 /**
@@ -278,6 +289,8 @@ uint32_t skip(Protocol_& prot, TType type) {
       return result;
     }
   case T_STOP: case T_VOID: case T_U64: case T_UTF8: case T_UTF16:
+    break;
+  case T_UNKNOWN:
     break;
   }
   return 0;

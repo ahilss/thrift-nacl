@@ -34,6 +34,7 @@
 #include <thrift/concurrency/Monitor.h>
 #include <thrift/concurrency/PlatformThreadFactory.h>
 #include <thrift/concurrency/Thread.h>
+#include <thrift/concurrency/Util.h>
 
 namespace apache { namespace thrift { namespace transport {
 

@@ -64,6 +64,7 @@ libthrift_la_SOURCES = src/thrift/Thrift.cpp \
                        src/thrift/protocol/TJSONProtocol.cpp \
                        src/thrift/protocol/TBase64Utils.cpp \
                        src/thrift/protocol/TMultiplexedProtocol.cpp \
+                       src/thrift/protocol/TNativeClientProtocol.cpp \
                        src/thrift/transport/TTransportException.cpp \
                        src/thrift/transport/TFDTransport.cpp \
                        src/thrift/transport/TFileTransport.cpp \
@@ -162,6 +163,7 @@ include_protocol_HEADERS = \
                          src/thrift/protocol/TBase64Utils.h \
                          src/thrift/protocol/TJSONProtocol.h \
                          src/thrift/protocol/TMultiplexedProtocol.h \
+                         src/thrift/protocol/TNativeClientProtocol.h \
                          src/thrift/protocol/TProtocolDecorator.h \
                          src/thrift/protocol/TProtocolTap.h \
                          src/thrift/protocol/TProtocolException.h \

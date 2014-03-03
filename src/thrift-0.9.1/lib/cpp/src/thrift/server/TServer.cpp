@@ -33,6 +33,7 @@
 namespace apache { namespace thrift { namespace server {
 
 int increase_max_fds(int max_fds=(1<<24))  {
+#ifndef __native_client__
   struct rlimit fdmaxrl;
 
   for(fdmaxrl.rlim_cur = max_fds, fdmaxrl.rlim_max = max_fds;
@@ -42,6 +43,9 @@ int increase_max_fds(int max_fds=(1<<24))  {
   }
 
   return static_cast<int>(fdmaxrl.rlim_cur);
+#else
+  return max_fds;
+#endif // __native_client__
 }
 
 }}} // apache::thrift::server

@@ -238,7 +238,7 @@ void TSocket::openConnection(struct addrinfo *res) {
   int ret;
   if (! path_.empty()) {
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__native_client__)
 
     struct sockaddr_un address;
     socklen_t len;

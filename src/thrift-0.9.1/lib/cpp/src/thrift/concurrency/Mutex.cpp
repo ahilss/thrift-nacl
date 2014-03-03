@@ -262,7 +262,11 @@ public:
 #ifndef THRIFT_NO_CONTENTION_PROFILING
     profileTime_ = 0;
 #endif
+#ifndef __native_client__
     int ret = pthread_rwlock_init(&rw_lock_, NULL);
+#else
+    int ret = pthread_mutex_init(&rw_lock_, NULL);
+#endif
     THRIFT_UNUSED_VARIABLE(ret);
     assert(ret == 0);
     initialized_ = true;
@@ -271,7 +275,11 @@ public:
   ~impl() {
     if(initialized_) {
       initialized_ = false;
+#ifndef __native_client__
       int ret = pthread_rwlock_destroy(&rw_lock_);
+#else
+      int ret = pthread_mutex_destroy(&rw_lock_);
+#endif
       THRIFT_UNUSED_VARIABLE(ret);
       assert(ret == 0);
     }
@@ -279,28 +287,56 @@ public:
 
   void acquireRead() const {
     PROFILE_MUTEX_START_LOCK();
+#ifndef __native_client__
     pthread_rwlock_rdlock(&rw_lock_);
+#else
+    pthread_mutex_lock(&rw_lock_);
+#endif
     PROFILE_MUTEX_NOT_LOCKED();  // not exclusive, so use not-locked path
   }
 
   void acquireWrite() const {
     PROFILE_MUTEX_START_LOCK();
+#ifndef __native_client__
     pthread_rwlock_wrlock(&rw_lock_);
+#else
+    pthread_mutex_lock(&rw_lock_);
+#endif
     PROFILE_MUTEX_LOCKED();
   }
 
-  bool attemptRead() const { return !pthread_rwlock_tryrdlock(&rw_lock_); }
+  bool attemptRead() const {
+#ifndef __native_client__
+    return !pthread_rwlock_tryrdlock(&rw_lock_);
+#else
+    return !pthread_mutex_trylock(&rw_lock_);
+#endif
+}
 
-  bool attemptWrite() const { return !pthread_rwlock_trywrlock(&rw_lock_); }
+  bool attemptWrite() const {
+#ifndef __native_client__
+    return !pthread_rwlock_trywrlock(&rw_lock_);
+#else
+    return !pthread_mutex_trylock(&rw_lock_);
+#endif
+}
 
   void release() const {
     PROFILE_MUTEX_START_UNLOCK();
+#ifndef __native_client__
     pthread_rwlock_unlock(&rw_lock_);
+#else
+    pthread_mutex_unlock(&rw_lock_);
+#endif
     PROFILE_MUTEX_UNLOCKED();
   }
 
 private:
+#ifndef __native_client__
   mutable pthread_rwlock_t rw_lock_;
+#else
+  mutable pthread_mutex_t rw_lock_;
+#endif
   mutable bool initialized_;
 #ifndef THRIFT_NO_CONTENTION_PROFILING
   mutable int64_t profileTime_;

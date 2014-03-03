@@ -21036,12 +21036,7 @@ fi
 $as_echo "$ac_cv_lib_ssl_SSL_ctrl" >&6; }
 if test "x$ac_cv_lib_ssl_SSL_ctrl" = xyes; then :
   LIBS="-lssl -lcrypto $LIBS"
-else
-  as_fn_error $? "\"Error: libssl required\"" "$LINENO" 5
 fi
-
-else
-  as_fn_error $? "\"Error: libcrypto required.\"" "$LINENO" 5
 
 fi
 
@@ -21714,6 +21709,7 @@ fi
 fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_func_malloc_0_nonnull" >&5
 $as_echo "$ac_cv_func_malloc_0_nonnull" >&6; }
+ac_cv_func_malloc_0_nonnull=yes
 if test $ac_cv_func_malloc_0_nonnull = yes; then :
 
 $as_echo "#define HAVE_MALLOC 1" >>confdefs.h
@@ -21843,6 +21839,7 @@ fi
 fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_func_realloc_0_nonnull" >&5
 $as_echo "$ac_cv_func_realloc_0_nonnull" >&6; }
+ac_cv_func_realloc_0_nonnull=yes
 if test $ac_cv_func_realloc_0_nonnull = yes; then :
 
 $as_echo "#define HAVE_REALLOC 1" >>confdefs.h
