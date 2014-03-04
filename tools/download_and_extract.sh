@@ -1,3 +1,5 @@
+#!/bin/bash
+
 URL=$1
 SHA1=$2
 DST_DIR=$3
@@ -38,7 +40,7 @@ if [ ! -e "${OUTPUT_DIR}" ]; then
   echo "Extracting ${ARCHIVE_FILE}"
   pushd "${DST_DIR}"
 
-  if [ "${ARCHIVE_TYPE}" == 'zip' ]; then
+  if [ "${ARCHIVE_TYPE}" = 'zip' ]; then
     unzip "${ARCHIVE_FILE##*/}"
   else
     tar -xvzf "${ARCHIVE_FILE##*/}"

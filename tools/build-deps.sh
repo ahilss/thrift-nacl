@@ -1,4 +1,8 @@
+#!/bin/bash
+#
 # Build thrift compiler and naclports
+
+set -e
 
 ABSPATH=$(cd "$(dirname "$0")" && pwd)
 TOOLS_DIR=${ABSPATH}

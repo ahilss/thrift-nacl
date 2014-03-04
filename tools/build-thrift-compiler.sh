@@ -1,3 +1,5 @@
+#!/bin/bash
+#
 # Script for building thrift compiler
 #
 
