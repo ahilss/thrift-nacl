@@ -19,6 +19,7 @@
 
 #include <thrift/protocol/TBase64Utils.h>
 
+#include <boost/scoped_array.hpp>
 #include <boost/static_assert.hpp>
 
 using std::string;
@@ -101,10 +102,10 @@ void base64EncodeString(const std::string& in, std::string* out) {
 
   size_t remainder = in_size % 3;
   size_t out_size = 4 * (in_size / 3) + kEncodeRemainderSize[remainder];
-  uint8_t* out_data = new uint8_t[out_size];
+  boost::scoped_array<uint8_t> out_data(new uint8_t[out_size]);
 
   const uint8_t* in_ptr = in_data;
-  uint8_t* out_ptr = out_data;
+  uint8_t* out_ptr = out_data.get();
 
   const uint8_t* end_ptr = in_data + in_size - remainder;
 
@@ -120,8 +121,7 @@ void base64EncodeString(const std::string& in, std::string* out) {
     base64_encode(in_ptr, remainder, out_ptr);
   }
 
-  out->assign((char*)out_data, out_size);
-  delete [] out_data;
+  out->assign(reinterpret_cast<char*>(out_data.get()), out_size);
 }
 
 bool base64DecodeString(const std::string& in, std::string* out) {
@@ -142,10 +142,10 @@ bool base64DecodeString(const std::string& in, std::string* out) {
   }
 
   size_t out_size = 3 * (in_size / 4) + kDecodeRemainderSize[remainder];
-  uint8_t* out_data = new uint8_t[out_size];
+  boost::scoped_array<uint8_t> out_data(new uint8_t[out_size]);
 
   const uint8_t* in_ptr = in_data;
-  uint8_t* out_ptr = out_data;
+  uint8_t* out_ptr = out_data.get();
 
   const uint8_t* end_ptr = in_data + in_size - remainder;
 
@@ -161,8 +161,7 @@ bool base64DecodeString(const std::string& in, std::string* out) {
     base64_decode(in_ptr, remainder, out_ptr);
   }
 
-  out->assign((char*)out_data, out_size);
-  delete [] out_data;
+  out->assign(reinterpret_cast<char*>(out_data.get()), out_size);
 
   return true;
 }

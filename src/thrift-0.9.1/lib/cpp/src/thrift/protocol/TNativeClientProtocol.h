@@ -22,6 +22,7 @@
 
 #include <thrift/protocol/TVirtualProtocol.h>
 
+#include <boost/ptr_container/ptr_deque.hpp>
 #include <stack>
 
 #include "ppapi/cpp/var.h"
@@ -205,15 +206,17 @@ class TNativeClientProtocol : public TVirtualProtocol<TNativeClientProtocol> {
 
   void pushWriterContext(WriterContext* context);
   void popWriterContext();
+  inline WriterContext* topWriterContext() { return &writer_stack_.back(); }
 
   void pushReaderContext(ReaderContext* context);
   void popReaderContext();
+  inline ReaderContext* topReaderContext() { return &reader_stack_.back(); }
 
   int64_t readIntegerValue();
 
  private:
-  std::stack<WriterContext*> writer_stack_;
-  std::stack<ReaderContext*> reader_stack_;
+  boost::ptr_deque<WriterContext> writer_stack_;
+  boost::ptr_deque<ReaderContext> reader_stack_;
 
   boost::shared_ptr<const pp::Var> root_var_;
 };

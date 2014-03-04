@@ -51,12 +51,8 @@ TNativeClientProtocol::TNativeClientProtocol(boost::shared_ptr<const pp::Var> va
 }
 
 void TNativeClientProtocol::reset() {
-  while (!writer_stack_.empty()) {
-    popWriterContext();
-  }
-  while (!reader_stack_.empty()) {
-    popReaderContext();
-  }
+  writer_stack_.clear();
+  reader_stack_.clear();
   root_var_.reset();
 }
 
@@ -73,8 +69,7 @@ void TNativeClientProtocol::writeVar(const pp::Var& var) {
     }
     root_var_ = boost::make_shared<pp::Var>(var);
   } else {
-    WriterContext* context = writer_stack_.top();
-    context->writeVar(var);
+    topWriterContext()->writeVar(var);
   }
 }
 
@@ -87,7 +82,7 @@ boost::shared_ptr<const pp::Var> TNativeClientProtocol::readVar() {
     }
     return root_var_;
   } else {
-    ReaderContext* context = reader_stack_.top();
+    ReaderContext* context = topReaderContext();
     T_DEBUG("readVar: %d %d", reader_stack_.size(), context->getIndex());
 
     boost::shared_ptr<pp::Var> var = boost::make_shared<pp::Var>();
@@ -100,24 +95,20 @@ boost::shared_ptr<const pp::Var> TNativeClientProtocol::readVar() {
 void TNativeClientProtocol::pushWriterContext(WriterContext* context) {
   assert(context->getVar().is_dictionary() || context->getVar().is_array());
   writeVar(context->getVar());
-  writer_stack_.push(context);
+  writer_stack_.push_back(context);
 }
 
 void TNativeClientProtocol::popWriterContext() {
-  WriterContext* context = writer_stack_.top();
-  writer_stack_.pop();
-  delete context;
+  writer_stack_.pop_back();
 }
 
 void TNativeClientProtocol::pushReaderContext(ReaderContext* context) {
   assert(context->getVar().is_dictionary() || context->getVar().is_array());
-  reader_stack_.push(context);
+  reader_stack_.push_back(context);
 }
 
 void TNativeClientProtocol::popReaderContext() {
-  ReaderContext* context = reader_stack_.top();
-  reader_stack_.pop();
-  delete context;
+  reader_stack_.pop_back();
 }
 
 uint32_t TNativeClientProtocol::writeMessageBegin(const std::string& name,
@@ -148,7 +139,7 @@ uint32_t TNativeClientProtocol::writeFieldBegin(const char* name,
                                                 const TType fieldType,
                                                 const int16_t fieldId) {
   T_DEBUG("writeFieldBegin: %s", name);
-  writer_stack_.top()->setFieldName(name); 
+  topWriterContext()->setFieldName(name); 
   return 0;
 }
 
@@ -276,7 +267,7 @@ uint32_t TNativeClientProtocol::readStructEnd() {
 uint32_t TNativeClientProtocol::readFieldBegin(std::string& name,
                                                TType& fieldType,
                                                int16_t& fieldId) {
-  ReaderContext* context = reader_stack_.top();
+  ReaderContext* context = topReaderContext();
 
   if (context->isAtEnd()) {
     fieldType = ::apache::thrift::protocol::T_STOP;
@@ -494,7 +485,7 @@ uint32_t TNativeClientProtocol::skip(TType type) {
   T_DEBUG("skip");
 
   if (!reader_stack_.empty()) {
-    reader_stack_.top()->advance();
+    topReaderContext()->advance();
   }
 
   return 0;
