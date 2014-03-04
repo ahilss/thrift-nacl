@@ -21,10 +21,10 @@ index e6e4c9b..ef5fded 100644
  	.travis.yml \
  	contrib \
 diff --git a/configure b/configure
-index 94b1beb..30155eb 100755
+index 94b1beb..f393de4 100755
 --- a/configure
 +++ b/configure
-@@ -21036,13 +21036,8 @@ fi
+@@ -21036,13 +21058,8 @@ fi
  $as_echo "$ac_cv_lib_ssl_SSL_ctrl" >&6; }
  if test "x$ac_cv_lib_ssl_SSL_ctrl" = xyes; then :
    LIBS="-lssl -lcrypto $LIBS"
@@ -38,7 +38,7 @@ index 94b1beb..30155eb 100755
  fi
  
  fi
-@@ -21714,6 +21709,7 @@ fi
+@@ -21714,6 +21731,7 @@ fi
  fi
  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_func_malloc_0_nonnull" >&5
  $as_echo "$ac_cv_func_malloc_0_nonnull" >&6; }
@@ -46,7 +46,7 @@ index 94b1beb..30155eb 100755
  if test $ac_cv_func_malloc_0_nonnull = yes; then :
  
  $as_echo "#define HAVE_MALLOC 1" >>confdefs.h
-@@ -21843,6 +21839,7 @@ fi
+@@ -21843,6 +21861,7 @@ fi
  fi
  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_func_realloc_0_nonnull" >&5
  $as_echo "$ac_cv_func_realloc_0_nonnull" >&6; }
@@ -363,10 +363,18 @@ index d8200cb..e50c910 100644
  #include <boost/shared_ptr.hpp>
  #include <map>
 diff --git a/lib/cpp/src/thrift/protocol/TBase64Utils.cpp b/lib/cpp/src/thrift/protocol/TBase64Utils.cpp
-index cd343ed..dbc1a53 100644
+index cd343ed..00bd33c 100644
 --- a/lib/cpp/src/thrift/protocol/TBase64Utils.cpp
 +++ b/lib/cpp/src/thrift/protocol/TBase64Utils.cpp
-@@ -75,5 +75,97 @@ void base64_decode(uint8_t *buf, uint32_t len) {
+@@ -19,6 +19,7 @@
+ 
+ #include <thrift/protocol/TBase64Utils.h>
+ 
++#include <boost/scoped_array.hpp>
+ #include <boost/static_assert.hpp>
+ 
+ using std::string;
+@@ -75,5 +76,95 @@ void base64_decode(uint8_t *buf, uint32_t len) {
    }
  }
  
@@ -396,10 +404,10 @@ index cd343ed..dbc1a53 100644
 +
 +  size_t remainder = in_size % 3;
 +  size_t out_size = 4 * (in_size / 3) + kEncodeRemainderSize[remainder];
-+  uint8_t* out_data = new uint8_t[out_size];
++  boost::scoped_array<uint8_t> out_data(new uint8_t[out_size]);
 +
 +  const uint8_t* in_ptr = in_data;
-+  uint8_t* out_ptr = out_data;
++  uint8_t* out_ptr = out_data.get();
 +
 +  const uint8_t* end_ptr = in_data + in_size - remainder;
 +
@@ -415,8 +423,7 @@ index cd343ed..dbc1a53 100644
 +    base64_encode(in_ptr, remainder, out_ptr);
 +  }
 +
-+  out->assign((char*)out_data, out_size);
-+  delete [] out_data;
++  out->assign(reinterpret_cast<char*>(out_data.get()), out_size);
 +}
 +
 +bool base64DecodeString(const std::string& in, std::string* out) {
@@ -437,10 +444,10 @@ index cd343ed..dbc1a53 100644
 +  }
 +
 +  size_t out_size = 3 * (in_size / 4) + kDecodeRemainderSize[remainder];
-+  uint8_t* out_data = new uint8_t[out_size];
++  boost::scoped_array<uint8_t> out_data(new uint8_t[out_size]);
 +
 +  const uint8_t* in_ptr = in_data;
-+  uint8_t* out_ptr = out_data;
++  uint8_t* out_ptr = out_data.get();
 +
 +  const uint8_t* end_ptr = in_data + in_size - remainder;
 +
@@ -456,8 +463,7 @@ index cd343ed..dbc1a53 100644
 +    base64_decode(in_ptr, remainder, out_ptr);
 +  }
 +
-+  out->assign((char*)out_data, out_size);
-+  delete [] out_data;
++  out->assign(reinterpret_cast<char*>(out_data.get()), out_size);
 +
 +  return true;
 +}
@@ -481,10 +487,10 @@ index 3def733..8d943d4 100644
  #endif // #define _THRIFT_PROTOCOL_TBASE64UTILS_H_
 diff --git a/lib/cpp/src/thrift/protocol/TNativeClientProtocol.cpp b/lib/cpp/src/thrift/protocol/TNativeClientProtocol.cpp
 new file mode 100644
-index 0000000..dd562e0
+index 0000000..fc398ac
 --- /dev/null
 +++ b/lib/cpp/src/thrift/protocol/TNativeClientProtocol.cpp
-@@ -0,0 +1,699 @@
+@@ -0,0 +1,690 @@
 +/*
 + * Licensed to the Apache Software Foundation (ASF) under one
 + * or more contributor license agreements. See the NOTICE file
@@ -538,12 +544,8 @@ index 0000000..dd562e0
 +}
 +
 +void TNativeClientProtocol::reset() {
-+  while (!writer_stack_.empty()) {
-+    popWriterContext();
-+  }
-+  while (!reader_stack_.empty()) {
-+    popReaderContext();
-+  }
++  writer_stack_.clear();
++  reader_stack_.clear();
 +  root_var_.reset();
 +}
 +
@@ -560,8 +562,7 @@ index 0000000..dd562e0
 +    }
 +    root_var_ = boost::make_shared<pp::Var>(var);
 +  } else {
-+    WriterContext* context = writer_stack_.top();
-+    context->writeVar(var);
++    topWriterContext()->writeVar(var);
 +  }
 +}
 +
@@ -574,7 +575,7 @@ index 0000000..dd562e0
 +    }
 +    return root_var_;
 +  } else {
-+    ReaderContext* context = reader_stack_.top();
++    ReaderContext* context = topReaderContext();
 +    T_DEBUG("readVar: %d %d", reader_stack_.size(), context->getIndex());
 +
 +    boost::shared_ptr<pp::Var> var = boost::make_shared<pp::Var>();
@@ -587,24 +588,20 @@ index 0000000..dd562e0
 +void TNativeClientProtocol::pushWriterContext(WriterContext* context) {
 +  assert(context->getVar().is_dictionary() || context->getVar().is_array());
 +  writeVar(context->getVar());
-+  writer_stack_.push(context);
++  writer_stack_.push_back(context);
 +}
 +
 +void TNativeClientProtocol::popWriterContext() {
-+  WriterContext* context = writer_stack_.top();
-+  writer_stack_.pop();
-+  delete context;
++  writer_stack_.pop_back();
 +}
 +
 +void TNativeClientProtocol::pushReaderContext(ReaderContext* context) {
 +  assert(context->getVar().is_dictionary() || context->getVar().is_array());
-+  reader_stack_.push(context);
++  reader_stack_.push_back(context);
 +}
 +
 +void TNativeClientProtocol::popReaderContext() {
-+  ReaderContext* context = reader_stack_.top();
-+  reader_stack_.pop();
-+  delete context;
++  reader_stack_.pop_back();
 +}
 +
 +uint32_t TNativeClientProtocol::writeMessageBegin(const std::string& name,
@@ -635,7 +632,7 @@ index 0000000..dd562e0
 +                                                const TType fieldType,
 +                                                const int16_t fieldId) {
 +  T_DEBUG("writeFieldBegin: %s", name);
-+  writer_stack_.top()->setFieldName(name); 
++  topWriterContext()->setFieldName(name); 
 +  return 0;
 +}
 +
@@ -763,7 +760,7 @@ index 0000000..dd562e0
 +uint32_t TNativeClientProtocol::readFieldBegin(std::string& name,
 +                                               TType& fieldType,
 +                                               int16_t& fieldId) {
-+  ReaderContext* context = reader_stack_.top();
++  ReaderContext* context = topReaderContext();
 +
 +  if (context->isAtEnd()) {
 +    fieldType = ::apache::thrift::protocol::T_STOP;
@@ -981,7 +978,7 @@ index 0000000..dd562e0
 +  T_DEBUG("skip");
 +
 +  if (!reader_stack_.empty()) {
-+    reader_stack_.top()->advance();
++    topReaderContext()->advance();
 +  }
 +
 +  return 0;
@@ -1186,10 +1183,10 @@ index 0000000..dd562e0
 +}}} // apache::thrift::protocol
 diff --git a/lib/cpp/src/thrift/protocol/TNativeClientProtocol.h b/lib/cpp/src/thrift/protocol/TNativeClientProtocol.h
 new file mode 100644
-index 0000000..bebeed9
+index 0000000..93b11c0
 --- /dev/null
 +++ b/lib/cpp/src/thrift/protocol/TNativeClientProtocol.h
-@@ -0,0 +1,238 @@
+@@ -0,0 +1,241 @@
 +/*
 + * Licensed to the Apache Software Foundation (ASF) under one
 + * or more contributor license agreements. See the NOTICE file
@@ -1214,6 +1211,7 @@ index 0000000..bebeed9
 +
 +#include <thrift/protocol/TVirtualProtocol.h>
 +
++#include <boost/ptr_container/ptr_deque.hpp>
 +#include <stack>
 +
 +#include "ppapi/cpp/var.h"
@@ -1397,15 +1395,17 @@ index 0000000..bebeed9
 +
 +  void pushWriterContext(WriterContext* context);
 +  void popWriterContext();
++  inline WriterContext* topWriterContext() { return &writer_stack_.back(); }
 +
 +  void pushReaderContext(ReaderContext* context);
 +  void popReaderContext();
++  inline ReaderContext* topReaderContext() { return &reader_stack_.back(); }
 +
 +  int64_t readIntegerValue();
 +
 + private:
-+  std::stack<WriterContext*> writer_stack_;
-+  std::stack<ReaderContext*> reader_stack_;
++  boost::ptr_deque<WriterContext> writer_stack_;
++  boost::ptr_deque<ReaderContext> reader_stack_;
 +
 +  boost::shared_ptr<const pp::Var> root_var_;
 +};
