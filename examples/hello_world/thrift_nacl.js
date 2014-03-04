@@ -27,6 +27,8 @@
           callbacks.onError(response.error);
         }
       }
+    } else {
+      throw new Error('Received message with unknown id: ' + response.id);
     }
   };
 
@@ -37,7 +39,11 @@
         data: data
     };
 
-    this.messageMap[this.nextMessageId] = {
+    if (message.id in this.messageMap) {
+      throw new Error('Duplicate message id: ' + message.id);
+    }
+
+    this.messageMap[message.id] = {
         onSuccess: onSuccess,
         onError: onError
     };
