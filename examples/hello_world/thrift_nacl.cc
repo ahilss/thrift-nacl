@@ -25,7 +25,7 @@ bool RegisterMessageHandler(const std::string& message_type,
 
 bool GetMessageHandler(const std::string& message_type,
                        MessageHandler* message_handler) {
-  MessageHandlerMap& message_handler_map = GetMessageHandlerMap();
+  const MessageHandlerMap& message_handler_map = GetMessageHandlerMap();
   MessageHandlerMap::const_iterator iter =
       message_handler_map.find(message_type);
 
